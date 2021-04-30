@@ -1,243 +1,66 @@
-#include <Arduino.h>
-#include <RCSwitch.h>
-#define USE_N2K_CAN USE_N2K_MCP_CAN
-#define N2k_SPI_CS_PIN 5
-#define N2k_CAN_INT_PIN 0xff
-#define USE_MCP_CAN_CLOCK_SET 8
-#include <NMEA2000_CAN.h>
-#include <N2kMessages.h>
-#include <math.h>
-
-RCSwitch m = RCSwitch();
-
 #define SINGLE_CLICK_DELAY_THRESHOLD 150
-#define AP_UNKNOWN -1
-#define AP_STANDBY 0
-#define AP_AUTO 1
-#define AP_WIND_VANE 2
-#define AP_TRACK 3
-#define AP_TRACK_DEV 4
-#define BLINK_TIME 100
 #define AP_STATUS_PIN 14
 #define AP_BLINK_PIN 13
+#define PROGRAM_PIN 34
 
-int setHeading = 32; // set to 32 for testing purposes, should be -1 and driven by the AP input
-int requestSetHeading = -1;
-unsigned long lastHeadTime = 0;
-int status = AP_UNKNOWN;
+#include <Arduino.h>
+#include <EEPROM.h>
+#include <RCSwitch.h>
+#include <math.h>
+#include "APStatus.h"
+#include "EvoN2K.h"
+#include "RFUtil.h"
 
-void msg_handler(const tN2kMsg &m)
-{
-  int pgn = m.PGN;
-  int index = 0;
-  switch (pgn) {
-    case 65360:
-      index = 5;
-      setHeading = RadToDeg(m.Get2ByteDouble(0.0001, index));
-      Serial.printf("Received locked heading %d\n", setHeading);
-      break;
-    case 65379:
-      index = 2;
-      int ap_m = m.GetByte(index);
-      int ap_sm = m.GetByte(index);
-      int ap_d = m.GetByte(index);
+RCSwitch m = RCSwitch();
+APStatus ap = APStatus(AP_STATUS_PIN);
+unsigned long remote = 0;
+bool program = false;
 
-      const char* s_status = "Unknown";
-      if (ap_m == 0 && ap_sm == 0) {
-        status = AP_STANDBY;
-        s_status = "StandBy";
-      } else if (ap_m == 64 && ap_sm == 0) {
-        status = AP_AUTO;
-        s_status = "Auto";
-      } else if (ap_m == 0 && ap_sm == 1) {
-        status = AP_WIND_VANE;
-        s_status = "Vane";
-      } else if (ap_m == 128 && ap_sm == 1) {
-        status = AP_TRACK;
-        s_status = "Track";
-      } else if (ap_m == 129 && ap_sm == 1) {
-        status = AP_TRACK_DEV;
-        s_status = "TrackDev";
-      }  else {
-        status = AP_UNKNOWN;
-        s_status = "Unknown";
-      }
-      Serial.printf("Received status (%d %d %d) %s\n", ap_m, ap_sm, ap_d, s_status);
-      digitalWrite(AP_STATUS_PIN, status>0?HIGH:LOW);
-      break;
-  }
+void write_remote() {
+    Serial.printf("Wrinting remote %lx to conf\n", remote);
+    EEPROM.writeULong(0, remote);
+    if (!EEPROM.commit()) {
+        Serial.printf("Failed to write remote code to conf\n");
+    }
 }
 
 void setup() {
   Serial.begin(115200);
-  m.enableReceive(22);
+  delay(1000);
 
-  pinMode(AP_BLINK_PIN, OUTPUT);
-  pinMode(AP_STATUS_PIN, OUTPUT);
-
-  Serial.printf("Initializing N2K\n");
-  NMEA2000.SetN2kCANSendFrameBufSize(3);
-  NMEA2000.SetN2kCANReceiveFrameBufSize(150),
-  NMEA2000.SetN2kCANMsgBufSize(15);
-  Serial.printf("Initializing N2K Product Info\n");
-  NMEA2000.SetProductInformation("00000001", // Manufacturer's Model serial code
-                                 100, // Manufacturer's product code
-                                /*1234567890123456789012345678901234567890*/
-                                 "ABN2k                           ",  // Manufacturer's Model ID
-                                 "1.0.2.25 (2019-07-07)",  // Manufacturer's Software version code
-                                 "1.0.2.0 (2019-07-07)" // Manufacturer's Model version
-                                 );
-  Serial.printf("Initializing N2K Device Info\n");
-  NMEA2000.SetDeviceInformation(1, // Unique number. Use e.g. Serial number.
-                                132, // Device function=Analog to NMEA 2000 Gateway. See codes on http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
-                                25, // Device class=Inter/Intranetwork Device. See codes on  http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
-                                2046 // Just choosen free from code list on http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
-                               );
-  Serial.printf("Initializing N2K mode\n");
-  NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, 15);
-  NMEA2000.EnableForward(false); // Disable all msg forwarding to USB (=Serial)
-  NMEA2000.SetMsgHandler(msg_handler);
-  Serial.printf("Initializing N2K Port & Handlers\n");
-  bool initialized = NMEA2000.Open();
-  Serial.printf("Initializing N2K %s\n", initialized?"OK":"KO");
-}
-
-void SwitchPilot(bool onOff) {
-  tN2kMsg m;
-  m.Init(2, 126208, 99, 255);
-  byte b[] = {
-                    (byte) 0x01,  // 126208 type (1 means "command")
-                    (byte) 0x63,  // PGN 65379
-                    (byte) 0xff,  // PGN 65379
-                    (byte) 0x00,  // PGN 65379
-                    (byte) 0xf8,  // priority + reserved
-                    (byte) 0x04,  // 4 params
-                    (byte) 0x01,  // first param - 1 of PGN 65379 (manufacturer code)
-                    (byte) 0x3b,  // 1851 Raymarine
-                    (byte) 0x07,  // 1851 Raymarine
-                    (byte) 0x03,  // second param -  3 of pgn 65369 (Industry code)
-                    (byte) 0x04,  // Ind. code 4
-                    (byte) 0x04,  // third parameter - 4 of pgn 65379 (mode)
-                    (byte) 0x00,  // code 0 (STDBY)
-                    (byte) 0x00,  // fourth param - 0 (does not exists, seems to be a Raymarine hack)
-                    (byte) 0x05   // value of weird raymarine param
-  };
-  if (onOff) b[12] = 0x40;
-  for (int i = 0; i<15; i++) m.AddByte(b[i]);
-  bool res = NMEA2000.SendMsg(m);
-  Serial.printf("Switching pilot %s %s\n", onOff?"On":"Off", res?"Ok":"Fail");
-
-  // debug
-  status = onOff?AP_AUTO:AP_STANDBY;
-  digitalWrite(AP_STATUS_PIN, onOff?HIGH:LOW);
-  // end debug
-}
-
-int SetHeading(int delta) {
-  if (status!=AP_AUTO) {
-      Serial.printf("Unsupported status (only AUTO [0] is supported): %d\n", status);
-      return -9;
-  } else if (requestSetHeading==-1) {
-    if (setHeading==-1) {
-      Serial.printf("Set pilot heading error: %s\n", "no value for locked heading");
-      return -1;
-    } else {
-      // initialize the request with th current value of the "locked head" of the AP
-      requestSetHeading = setHeading;
-    }
-  }
-
-  lastHeadTime = time(0);
-
-  int oldRequest = requestSetHeading;
-  requestSetHeading += delta;
-  requestSetHeading = (requestSetHeading+360)%360;
-  long lHeading = (long)round(requestSetHeading * M_PI / 180.0 / 0.0001);
-
-  byte byte0 = (byte) (lHeading & 0xff);
-  byte byte1 = (byte) (lHeading >> 8);
-
-  byte b[] = {
-                (byte)0x01,
-                (byte)0x50, // pgn 65360
-                (byte)0xff, // pgn 65360
-                (byte)0x00, // pgn 65360
-                (byte)0xf8, // priority + reserved
-                (byte)0x03, // n params
-                (byte)0x01, (byte)0x3b, (byte)0x07, // param 1
-                (byte)0x03, (byte)0x04, // param 2
-                (byte)0x06, byte0, byte1 // param 3: heading
-  };
-  tN2kMsg m;
-  m.Init(2, 126208, 99, 255);
-  for (int i = 0; i<14; i++) m.AddByte(b[i]);
-  bool res = NMEA2000.SendMsg(m);
-  if (res) {
-    Serial.printf("Set pilot heading %d\n", requestSetHeading);
+  EEPROM.begin(sizeof(unsigned long)+1);
+  remote = EEPROM.readULong(0);
+  if (remote==0) {
+    remote = 0xafb700;
+    write_remote();
   } else {
-    requestSetHeading = oldRequest;
-    Serial.printf("Set pilot heading error\n");
-  }
-  return 0;
-}
-
-void resetHeading() {
-  if (requestSetHeading!=-1) {
-    long now = time(0);
-    if ((now-lastHeadTime)>5) {
-      requestSetHeading = -1;
-      Serial.printf("Debug: reset pilot heading\n");
-    }
+    Serial.printf("Read remote %lx from conf\n", remote);
   }
 
+  m.enableReceive(22);
+  ap.setup();
+  EVON2K::setup(&ap);
+  pinMode(AP_BLINK_PIN, OUTPUT);
+  pinMode(PROGRAM_PIN, INPUT);
 }
 
-void loop() {
+void loop_normal() {
   static bool led = false;
   static unsigned long led_time = 0;
 
   unsigned long t = millis();
   static long t0 = 0;
   if (m.available()) {
-    digitalWrite(13, HIGH);
+    digitalWrite(AP_BLINK_PIN, HIGH);
     led = true;
     led_time = t;
     if ((t - t0)>SINGLE_CLICK_DELAY_THRESHOLD) {
-      //char c[] = {0, 0, 0};
-      switch (m.getReceivedValue()) {
-        case 0xafb7e1:
-          //c[0] = 'A'; c[1] = 0;
-          SetHeading(-1); break;
-        case 0xafb7e2:
-          //c[0] = 'B'; c[1] = 0;
-          SetHeading(+1); break;
-        case 0xafb7e3:
-          //c[0] = 'A'; c[1] = 'B';
-          SwitchPilot(false); break;
-        case 0xafb7e4:
-          //c[0] = 'C'; c[1] = 0;
-          SetHeading(-10); break;
-        case 0xafb7e5:
-          //c[0] = 'A'; c[1] = 'C';
-          break;
-        case 0xafb7e6:
-          //c[0] = 'B'; c[1] = 'C';
-          break;
-        case 0xafb7e8:
-          //c[0] = 'D'; c[1] = 0;
-          SetHeading(+10); break;
-        case 0xafb7e9:
-          //c[0] = 'A'; c[1] = 'D';
-          break;
-        case 0xafb7ea:
-          //c[0] = 'B'; c[1] = 'D';
-          break;
-        case 0xafb7ec:
-          //c[0] = 'C'; c[1] = 'D';
-          SwitchPilot(true);
-          break;
+      RFUtil r(m.getReceivedValue(), remote);
+      if (r.getAction()==SET_STATUS_ACTION) {
+          EVON2K::switchStatus(r.get_status());
+      } else if (r.getAction()==SET_LOCKED_HEADING_ACTION) {
+        EVON2K::setLockedHeading(r.get_delta_degrees());
       }
-      //Serial.printf("-- Clicked %s\n", c);
     }
     t0 = t;
     m.resetAvailable();
@@ -247,7 +70,32 @@ void loop() {
       led = false;
     }
   }
-  NMEA2000.ParseMessages();
-  resetHeading();
+  EVON2K::poll();
   delay(100);
+}
+
+void loop_program() {
+  if (m.available()) {
+    remote = m.getReceivedValue() & 0xffff00;
+    write_remote();
+    program = false;
+    digitalWrite(AP_BLINK_PIN, LOW);
+    printf("Switching to normal mode.\n");
+  }
+  m.resetAvailable();
+  delay(100);
+}
+
+void loop() {
+  if (program) {
+    loop_program();
+  } else {
+    loop_normal();
+  }
+  if (!program && digitalRead(PROGRAM_PIN)==HIGH) {
+    program = true;
+    digitalWrite(AP_BLINK_PIN, HIGH);
+    printf("Switching to program mode. Click a button to complete.\n");
+  }
+
 }
