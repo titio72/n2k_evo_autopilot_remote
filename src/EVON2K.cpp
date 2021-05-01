@@ -15,6 +15,7 @@ APStatus* status = NULL;
 int request_locked_heading = -1;
 int locked_heading = -1;
 unsigned long lastHeadTime = 0;
+bool debug = false;
 
 void EVON2K::switchStatus(int s) {
   tN2kMsg m;
@@ -42,7 +43,9 @@ void EVON2K::switchStatus(int s) {
   Serial.printf("Switching pilot %s %s\n", (s==AP_AUTO)?"On":"Off", res?"Ok":"Fail");
 
   // debug
-  status->overrideStatus((s==AP_AUTO)?AP_AUTO:AP_STANDBY);
+  if (debug) {
+    status->overrideStatus((s==AP_AUTO)?AP_AUTO:AP_STANDBY);
+  }
   // end debug
 }
 
@@ -98,7 +101,8 @@ void on_msg(const tN2kMsg &msg) {
     status->onPGN(msg);
 }
 
-void EVON2K::setup(APStatus* s) {
+void EVON2K::setup(APStatus* s, boolean d) {
+  debug = d;
   request_locked_heading = -1;
   locked_heading = 32; // set to 32 for testing purposes, should be -1 and driven by the AP input
   lastHeadTime = 0;

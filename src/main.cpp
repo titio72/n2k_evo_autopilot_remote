@@ -15,6 +15,7 @@ RCSwitch m = RCSwitch();
 APStatus ap = APStatus(AP_STATUS_PIN);
 unsigned long remote = 0;
 bool program = false;
+const bool debug = true;
 
 void write_remote() {
     Serial.printf("Wrinting remote %lx to conf\n", remote);
@@ -39,7 +40,7 @@ void setup() {
 
   m.enableReceive(22);
   ap.setup();
-  EVON2K::setup(&ap);
+  EVON2K::setup(&ap, debug);
   pinMode(AP_BLINK_PIN, OUTPUT);
   pinMode(PROGRAM_PIN, INPUT);
 }

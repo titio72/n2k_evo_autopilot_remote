@@ -8,7 +8,7 @@ class APStatus;
 class EVON2K {
 
 public:
-    static void setup(APStatus* ap);
+    static void setup(APStatus* ap, bool debug = false);
 
 public:
     static void switchStatus(int status);
