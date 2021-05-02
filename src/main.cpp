@@ -15,7 +15,7 @@ RCSwitch m = RCSwitch();
 APStatus ap = APStatus(AP_STATUS_PIN);
 unsigned long remote = 0;
 bool program = false;
-const bool debug = true;
+const bool debug = false;
 
 void write_remote() {
     Serial.printf("Wrinting remote %lx to conf\n", remote);
@@ -72,7 +72,6 @@ void loop_normal() {
     }
   }
   EVON2K::poll();
-  delay(100);
 }
 
 void loop_program() {
@@ -84,7 +83,7 @@ void loop_program() {
     printf("Switching to normal mode.\n");
   }
   m.resetAvailable();
-  delay(100);
+  delay(10);
 }
 
 void loop() {
