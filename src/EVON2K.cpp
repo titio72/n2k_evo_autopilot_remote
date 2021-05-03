@@ -1,3 +1,7 @@
+//#define USE_N2K_CAN 7
+//#define ESP32_CAN_RX_PIN GPIO_NUM_22
+//#define ESP32_CAN_TX_PIN GPIO_NUM_23
+
 #define USE_N2K_CAN USE_N2K_MCP_CAN
 #define N2k_SPI_CS_PIN 5
 #define N2k_CAN_INT_PIN 0xff
