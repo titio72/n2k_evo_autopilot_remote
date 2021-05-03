@@ -17,7 +17,7 @@
 APStatus* status = NULL;
 
 #define DEST 204
-#define SOURCE 204
+#define SOURCE 23
 
 int request_locked_heading = -1;
 unsigned long lastHeadTime = 0;
