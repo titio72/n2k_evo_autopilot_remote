@@ -38,7 +38,7 @@ void setup() {
     Serial.printf("Read remote %lx from conf\n", remote);
   }
 
-  m.enableReceive(22);
+  m.enableReceive(19);
   ap.setup();
   EVON2K::setup(&ap, debug);
   pinMode(AP_BLINK_PIN, OUTPUT);
