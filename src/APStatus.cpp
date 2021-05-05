@@ -2,7 +2,7 @@
 #include <math.h>
 #include "APStatus.h"
 
-APStatus::APStatus(int statusPin): status(AP_UNKNOWN), lockedHeading(0), pin(statusPin) {
+APStatus::APStatus(int statusPin): status(AP_UNKNOWN), lockedHeading(-1), pin(statusPin) {
 }
 
 APStatus::~APStatus() {
@@ -28,13 +28,18 @@ void APStatus::overrideStatus(int s) {
 
 void APStatus::onPGN(const tN2kMsg &m)
 {
+ // printf("Msg %ul\n", m.PGN);
   int pgn = m.PGN;
   int index = 0;
+  int x = 0;
   switch (pgn) {
     case 65360:
       index = 5;
-      lockedHeading = RadToDeg(m.Get2ByteUDouble(0.0001, index));
-      Serial.printf("Received locked heading %d\n", lockedHeading);
+      x = (int)((RadToDeg(m.Get2ByteUDouble(0.0001, index))) + 360) % 360;
+      if (x!=lockedHeading) {
+        Serial.printf("New locked heading %d\n", x);
+      }
+      lockedHeading = x;
       break;
     case 65379:
       index = 2;
@@ -42,6 +47,7 @@ void APStatus::onPGN(const tN2kMsg &m)
       int ap_sm = m.GetByte(index);
       int ap_d = m.GetByte(index);
 
+      int old_status = status;
       const char* s_status = "Unknown";
       if (ap_m == 0 && ap_sm == 0) {
         status = AP_STANDBY;
@@ -62,7 +68,9 @@ void APStatus::onPGN(const tN2kMsg &m)
         status = AP_UNKNOWN;
         s_status = "Unknown";
       }
-      Serial.printf("Received status (%d %d %d) %s\n", ap_m, ap_sm, ap_d, s_status);
+      if (old_status!=status) {
+        Serial.printf("Received status (%d %d %d) %s\n", ap_m, ap_sm, ap_d, s_status);
+      }
       digitalWrite(pin, status>0?HIGH:LOW);
       break;
   }
