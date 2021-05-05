@@ -33,7 +33,7 @@ void APStatus::onPGN(const tN2kMsg &m)
   switch (pgn) {
     case 65360:
       index = 5;
-      lockedHeading = RadToDeg(m.Get2ByteDouble(0.0001, index));
+      lockedHeading = RadToDeg(m.Get2ByteUDouble(0.0001, index));
       Serial.printf("Received locked heading %d\n", lockedHeading);
       break;
     case 65379:

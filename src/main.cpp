@@ -1,7 +1,10 @@
+
+
 #define SINGLE_CLICK_DELAY_THRESHOLD 150
 #define AP_STATUS_PIN 14
 #define AP_BLINK_PIN 13
 #define PROGRAM_PIN 34
+#define RADIO_PIN 17
 
 #include <Arduino.h>
 #include <EEPROM.h>
@@ -38,7 +41,7 @@ void setup() {
     Serial.printf("Read remote %lx from conf\n", remote);
   }
 
-  m.enableReceive(22);
+  m.enableReceive(RADIO_PIN);
   ap.setup();
   EVON2K::setup(&ap, debug);
   pinMode(AP_BLINK_PIN, OUTPUT);

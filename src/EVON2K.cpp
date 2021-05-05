@@ -1,14 +1,24 @@
+// use this block with esp and transceiver
+//#define USE_N2K_CAN USE_N2K_ESP32_CAN
+//#define ESP32_CAN_RX_PIN GPIO_NUM_22
+//#define ESP32_CAN_TX_PIN GPIO_NUM_23
+
+// use this block with MCP2515
 #define USE_N2K_CAN USE_N2K_MCP_CAN
 #define N2k_SPI_CS_PIN 5
 #define N2k_CAN_INT_PIN 0xff
 #define USE_MCP_CAN_CLOCK_SET 8
-#include "EvoN2K.h"
-#include "APStatus.h"
+
+#define SOURCE 23
+
 #include <Arduino.h>
-#include <RCSwitch.h>
 #include <NMEA2000_CAN.h>
+#include <RCSwitch.h>
 #include <N2kMessages.h>
 #include <math.h>
+
+#include "EvoN2K.h"
+#include "APStatus.h"
 
 APStatus* status = NULL;
 
@@ -19,7 +29,7 @@ bool debug = false;
 
 void EVON2K::switchStatus(int s) {
   tN2kMsg m;
-  m.Init(2, 126208, 99, 255);
+  m.Init(2, 126208, SOURCE, 255);
   byte b[] = {
                     (byte) 0x01,  // 126208 type (1 means "command")
                     (byte) 0x63,  // PGN 65379
@@ -85,7 +95,7 @@ int EVON2K::setLockedHeading(int delta) {
                 (byte)0x06, byte0, byte1 // param 3: heading
   };
   tN2kMsg m;
-  m.Init(2, 126208, 99, 255);
+  m.Init(2, 126208, SOURCE, 255);
   for (int i = 0; i<14; i++) m.AddByte(b[i]);
   bool res = NMEA2000.SendMsg(m);
   if (res) {
@@ -98,7 +108,8 @@ int EVON2K::setLockedHeading(int delta) {
 }
 
 void on_msg(const tN2kMsg &msg) {
-    status->onPGN(msg);
+  //Serial.printf("Message %lu\n", msg.PGN);
+  status->onPGN(msg);
 }
 
 void EVON2K::setup(APStatus* s, boolean d) {
@@ -126,7 +137,7 @@ void EVON2K::setup(APStatus* s, boolean d) {
                                 2046 // Just choosen free from code list on http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
                                );
   Serial.printf("Initializing N2K mode\n");
-  NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, 15);
+  NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, SOURCE);
   NMEA2000.EnableForward(false); // Disable all msg forwarding to USB (=Serial)
   NMEA2000.SetMsgHandler(on_msg);
   Serial.printf("Initializing N2K Port & Handlers\n");
