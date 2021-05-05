@@ -16,9 +16,8 @@ RCSwitch m = RCSwitch();
 APStatus ap = APStatus(AP_STATUS_PIN);
 unsigned long remote = 0;
 bool program = false;
-const bool debug = true;
 
-void write_remote() {
+void write_remote_id() {
     Serial.printf("Wrinting remote %lx to conf\n", remote);
     EEPROM.writeULong(0, remote);
     if (!EEPROM.commit()) {
@@ -26,22 +25,21 @@ void write_remote() {
     }
 }
 
+void read_remote_id() {
+  remote = EEPROM.readULong(0);
+  Serial.printf("Read remote %lx from conf\n", remote);
+}
+
 void setup() {
   Serial.begin(115200);
   delay(1000);
 
   EEPROM.begin(sizeof(unsigned long)+1);
-  remote = EEPROM.readULong(0);
-  if (remote==0) {
-    remote = 0xafb700;
-    write_remote();
-  } else {
-    Serial.printf("Read remote %lx from conf\n", remote);
-  }
+  read_remote_id();
 
   m.enableReceive(RADIO_PIN);
   ap.setup();
-  EVON2K::setup(&ap, debug);
+  EVON2K::setup(&ap);
   pinMode(AP_BLINK_PIN, OUTPUT);
   pinMode(PROGRAM_PIN, INPUT);
 }
@@ -79,7 +77,7 @@ void loop_normal() {
 void loop_program() {
   if (m.available()) {
     remote = m.getReceivedValue() & 0xffff00;
-    write_remote();
+    write_remote_id();
     program = false;
     digitalWrite(AP_BLINK_PIN, LOW);
     printf("Switching to normal mode.\n");
@@ -99,5 +97,4 @@ void loop() {
     digitalWrite(AP_BLINK_PIN, HIGH);
     printf("Switching to program mode. Click a button to complete.\n");
   }
-
 }

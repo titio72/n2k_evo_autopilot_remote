@@ -9,7 +9,10 @@
 #define N2k_CAN_INT_PIN 0xff
 #define USE_MCP_CAN_CLOCK_SET 8
 
+#define DEST 204
 #define SOURCE 23
+
+#define DEBUG_AP
 
 #include <Arduino.h>
 #include <NMEA2000_CAN.h>
@@ -20,14 +23,10 @@
 #include "EvoN2K.h"
 #include "APStatus.h"
 
+
 APStatus* status = NULL;
-
-#define DEST 204
-#define SOURCE 23
-
 int request_locked_heading = -1;
 unsigned long lastHeadTime = 0;
-bool debug = false;
 
 void EVON2K::switchStatus(int s) {
   tN2kMsg m;
@@ -54,11 +53,9 @@ void EVON2K::switchStatus(int s) {
   bool res = NMEA2000.SendMsg(m);
   Serial.printf("Switching pilot %s %s\n", (s==AP_AUTO)?"On":"Off", res?"Ok":"Fail");
 
-  // debug
-  if (debug) {
-    status->overrideStatus((s==AP_AUTO)?AP_AUTO:AP_STANDBY);
-  }
-  // end debug
+  #ifdef DEBUG_AP
+  status->overrideStatus((s==AP_AUTO)?AP_AUTO:AP_STANDBY);
+  #endif
 }
 
 int EVON2K::setLockedHeading(int delta) {
@@ -114,8 +111,7 @@ void on_msg(const tN2kMsg &msg) {
     status->onPGN(msg);
 }
 
-void EVON2K::setup(APStatus* s, boolean d) {
-  debug = d;
+void EVON2K::setup(APStatus* s) {
   request_locked_heading = -1;
   lastHeadTime = 0;
   status = s;
@@ -123,25 +119,16 @@ void EVON2K::setup(APStatus* s, boolean d) {
   NMEA2000.ExtendReceiveMessages(NULL);
   NMEA2000.SetN2kCANReceiveFrameBufSize(1500);
   NMEA2000.SetN2kCANMsgBufSize(16);
-  NMEA2000.SetProductInformation("00000001", // Manufacturer's Model serial code
-                                 100, // Manufacturer's product code
-                                /*1234567890123456789012345678901234567890*/
-                                 "ABRemote                        ",  // Manufacturer's Model ID
-                                 "1.0.0.0 (2021-05-01)",  // Manufacturer's Software version code
-                                 "1.0.0.0 (2021-05-01)"   // Manufacturer's Model version
+  NMEA2000.SetProductInformation("00000001", 100,
+                                /*12345678901234567890123456789012*/
+                                 "ABRemote                        ", "1.0.0.0 (2021-05-01)", "1.0.0.0 (2021-05-01)"
                                  );
-  NMEA2000.SetDeviceInformation(1, // Unique number. Use e.g. Serial number.
-                                130, // Device function=Analog to NMEA 2000 Gateway. See codes on http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
-                                120, // Device class=Inter/Intranetwork Device. See codes on  http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
-                                2047 // Just choosen free from code list on http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
-                               );
-  Serial.printf("Initializing N2K mode\n");
+  NMEA2000.SetDeviceInformation(1, /*Unique number. Use e.g. Serial number.*/ 150 /* Autopilot */, 40 /* Steering */, 2047);
   NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, SOURCE);
-  NMEA2000.EnableForward(false); // Disable all msg forwarding to USB (=Serial)
+  NMEA2000.EnableForward(false);
   NMEA2000.SetMsgHandler(on_msg);
-  Serial.printf("Initializing N2K Port & Handlers\n");
   bool initialized = NMEA2000.Open();
-  Serial.printf("Initializing N2K %s\n", initialized?"OK":"KO");
+  Serial.printf("Initialized N2K %s\n", initialized?"OK":"KO");
 
 }
 
