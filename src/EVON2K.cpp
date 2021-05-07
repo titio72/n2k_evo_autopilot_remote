@@ -51,7 +51,7 @@ void EVON2K::switchStatus(int s) {
   if (s==AP_AUTO) b[12] = 0x40;
   for (int i = 0; i<15; i++) m.AddByte(b[i]);
   bool res = NMEA2000.SendMsg(m);
-  Serial.printf("Switching pilot %s %s\n", (s==AP_AUTO)?"On":"Off", res?"Ok":"Fail");
+  Serial.printf("[NT] Switching pilot %s %s\n", (s==AP_AUTO)?"On":"Off", res?"Ok":"Fail");
 
   #ifdef DEBUG_AP
   status->overrideStatus((s==AP_AUTO)?AP_AUTO:AP_STANDBY);
@@ -60,11 +60,11 @@ void EVON2K::switchStatus(int s) {
 
 int EVON2K::setLockedHeading(int delta) {
   if (status->getStatus()!=AP_AUTO) {
-      Serial.printf("Unsupported status (only AUTO [0] is supported): %d\n", status->getStatus());
+      Serial.printf("[NT] Unsupported status (only AUTO [0] is supported): %d\n", status->getStatus());
       return -9;
   } else if (request_locked_heading==-1) {
     if (status->getLockedHeading()==-1) {
-      Serial.printf("Set pilot heading error: %s\n", "no value for locked heading");
+      Serial.printf("[NT] Set pilot heading error: %s\n", "no value for locked heading");
       return -1;
     } else {
       // initialize the request with th current value of the "locked head" of the AP
@@ -99,10 +99,10 @@ int EVON2K::setLockedHeading(int delta) {
   for (int i = 0; i<14; i++) m.AddByte(b[i]);
   bool res = NMEA2000.SendMsg(m);
   if (res) {
-    Serial.printf("Set pilot heading %d (%d)\n", request_locked_heading, oldRequest);
+    Serial.printf("[NT] Set pilot heading %d (%d)\n", request_locked_heading, oldRequest);
   } else {
     request_locked_heading = oldRequest;
-    Serial.printf("Set pilot heading error\n");
+    Serial.printf("[NT] Set pilot heading error\n");
   }
   return 0;
 }
@@ -115,7 +115,7 @@ void EVON2K::setup(APStatus* s) {
   request_locked_heading = -1;
   lastHeadTime = 0;
   status = s;
-  Serial.printf("Initializing N2K\n");
+  Serial.printf("[NT] Initializing N2K\n");
   NMEA2000.ExtendReceiveMessages(NULL);
   NMEA2000.SetN2kCANReceiveFrameBufSize(1500);
   NMEA2000.SetN2kCANMsgBufSize(16);
@@ -128,7 +128,7 @@ void EVON2K::setup(APStatus* s) {
   NMEA2000.EnableForward(false);
   NMEA2000.SetMsgHandler(on_msg);
   bool initialized = NMEA2000.Open();
-  Serial.printf("Initialized N2K %s\n", initialized?"OK":"KO");
+  Serial.printf("[NT] Initialized N2K %s\n", initialized?"OK":"KO");
 
 }
 
@@ -137,7 +137,7 @@ void resetHeading() {
     long now = time(0);
     if ((now-lastHeadTime)>5) {
       request_locked_heading = -1;
-      Serial.printf("Debug: reset pilot heading\n");
+      Serial.printf("[NT] reset pilot heading\n");
     }
   }
 }

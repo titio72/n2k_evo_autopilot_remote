@@ -9,7 +9,8 @@ APStatus::~APStatus() {
     digitalWrite(pin, LOW);
 }
 
-void APStatus::setup() {
+void APStatus::setup(status_listener l) {
+    listener = l;
     pinMode(pin, OUTPUT);
 }
 
@@ -21,9 +22,23 @@ int APStatus::getStatus() {
     return status;
 }
 
+const char* APStatus::getStatusStr() {
+  switch (status)
+  {
+  case AP_STANDBY: return "Standby";
+  case AP_AUTO: return "Auto";
+  case AP_WIND_VANE: return "Vane";
+  case AP_TRACK: return "Track";
+  case AP_TRACK_DEV: return "Trackdev";
+  default: return "Unknown";
+  }
+
+}
+
 void APStatus::overrideStatus(int s) {
     status = s;
     digitalWrite(pin, status>0?HIGH:LOW);
+    if (listener) listener(0x10);
 }
 
 void APStatus::onPGN(const tN2kMsg &m)
@@ -37,7 +52,8 @@ void APStatus::onPGN(const tN2kMsg &m)
       index = 5;
       x = (int)((RadToDeg(m.Get2ByteUDouble(0.0001, index))) + 360) % 360;
       if (x!=lockedHeading) {
-        Serial.printf("New locked heading %d\n", x);
+        Serial.printf("[AP] New locked heading %d\n", x);
+        if (listener) listener(0x01);
       }
       lockedHeading = x;
       break;
@@ -48,28 +64,22 @@ void APStatus::onPGN(const tN2kMsg &m)
       int ap_d = m.GetByte(index);
 
       int old_status = status;
-      const char* s_status = "Unknown";
       if (ap_m == 0 && ap_sm == 0) {
         status = AP_STANDBY;
-        s_status = "StandBy";
       } else if (ap_m == 64 && ap_sm == 0) {
         status = AP_AUTO;
-        s_status = "Auto";
       } else if (ap_m == 0 && ap_sm == 1) {
         status = AP_WIND_VANE;
-        s_status = "Vane";
       } else if (ap_m == 128 && ap_sm == 1) {
         status = AP_TRACK;
-        s_status = "Track";
       } else if (ap_m == 129 && ap_sm == 1) {
         status = AP_TRACK_DEV;
-        s_status = "TrackDev";
       }  else {
         status = AP_UNKNOWN;
-        s_status = "Unknown";
       }
       if (old_status!=status) {
-        Serial.printf("Received status (%d %d %d) %s\n", ap_m, ap_sm, ap_d, s_status);
+        Serial.printf("[AP] New status (%d %d %d) %s\n", ap_m, ap_sm, ap_d, getStatusStr());
+        if (listener) listener(0x10);
       }
       digitalWrite(pin, status>0?HIGH:LOW);
       break;

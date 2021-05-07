@@ -11,18 +11,22 @@
 #define AP_TRACK_DEV 4
 #define BLINK_TIME 100
 
+typedef void (*status_listener)(unsigned char event);
+
 class APStatus {
 public:
     APStatus(int statusPin);
     ~APStatus();
 
 public:
-    void setup();
+    void setup(status_listener l = NULL);
+
 
     void onPGN(const tN2kMsg &m);
 
     int getLockedHeading();
     int getStatus();
+    const char* getStatusStr();
 
     // use for testing only
     void overrideStatus(int status);
@@ -31,6 +35,8 @@ private:
     int status;
     int lockedHeading;
     int pin;
+
+    status_listener listener;
 };
 
 
