@@ -40,18 +40,36 @@ void on_status(u_char event) {
 }
 
 const char* on_command(const char* command) {
+  Serial.printf("[BT] Received command '%s'\n", command);
   if (strcmp("AUTO", command)==0) {
     EVON2K::switchStatus(AP_AUTO);
     return "OK";
   } else if (strcmp("STANDBY", command)==0) {
     EVON2K::switchStatus(AP_STANDBY);
     return "OK";
+  } else if (strcmp("+1", command)==0) {
+    EVON2K::port1();
+    return "OK";
+  } else if (strcmp("+10", command)==0) {
+    EVON2K::port10();
+    return "OK";
+  } else if (strcmp("-1", command)==0) {
+    EVON2K::starboard1();
+    return "OK";
+  } else if (strcmp("-10", command)==0) {
+    EVON2K::starboard10();
+    return "OK";
+  } else if (strcmp("TP", command)==0) {
+    EVON2K::tackPort();
+    return "OK";
+  } else if (strcmp("TS", command)==0) {
+    EVON2K::tackStarboard();
+    return "OK";
   } else if (command && (command[0]=='+' || command[0]=='-')) {
     int delta = atoi(command);
     if (delta) EVON2K::setLockedHeading(delta);
     return "OK";
   } else {
-    Serial.printf("[BT] Unrecognized command {%s}\n", command);
     return "Unknownd command";
   }
 }
@@ -91,6 +109,7 @@ void loop_normal(unsigned long t) {
     led_time = t;
     if ((t - t0)>SINGLE_CLICK_DELAY_THRESHOLD) {
       RFUtil r(m.getReceivedValue(), remote);
+      Serial.printf("[RF] Received combination %d%d%d%d\n", r.is_A_pressed(), r.is_B_pressed(), r.is_C_pressed(), r.is_D_pressed());
       switch (r.getAction()) {
         case SET_STATUS_ACTION:
           EVON2K::switchStatus(r.get_status());
