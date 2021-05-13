@@ -3,6 +3,7 @@
 #define AP_BLINK_PIN 13
 #define PROGRAM_PIN 34
 #define RADIO_PIN 17
+#define BEEP_PIN 16
 
 #include <Arduino.h>
 #include <EEPROM.h>
@@ -27,7 +28,7 @@ void write_remote_id() {
     }
 }
 
-void on_status(unsigned char event) {
+void on_status(u_char event) {
   static char buffer[128];
   if (event & 0x01) {
     sprintf(buffer, "[AP] Locked heading {%d}", ap.getLockedHeading());
@@ -75,9 +76,8 @@ void setup() {
   EVON2K::setup(&ap);
   pinMode(AP_BLINK_PIN, OUTPUT);
   pinMode(PROGRAM_PIN, INPUT);
+  pinMode(BEEP_PIN, OUTPUT);
 }
-
-
 
 void loop_normal(unsigned long t) {
   static bool led = false;
@@ -86,21 +86,46 @@ void loop_normal(unsigned long t) {
   static long t0 = 0;
   if (m.available()) {
     digitalWrite(AP_BLINK_PIN, HIGH);
+    digitalWrite(BEEP_PIN, HIGH);
     led = true;
     led_time = t;
     if ((t - t0)>SINGLE_CLICK_DELAY_THRESHOLD) {
       RFUtil r(m.getReceivedValue(), remote);
-      if (r.getAction()==SET_STATUS_ACTION) {
+      switch (r.getAction()) {
+        case SET_STATUS_ACTION:
           EVON2K::switchStatus(r.get_status());
-      } else if (r.getAction()==SET_LOCKED_HEADING_ACTION) {
-        EVON2K::setLockedHeading(r.get_delta_degrees());
+          break;
+        case SET_LOCKED_HEADING_ACTION:
+          EVON2K::setLockedHeading(r.get_delta_degrees());
+          break;
+        case GO_STARBOARD_BY_1_ACTION:
+          EVON2K::starboard1();
+          break;
+        case GO_STARBOARD_BY_10_ACTION:
+          EVON2K::starboard10();
+          break;
+        case GO_PORT_BY_1_ACTION:
+          EVON2K::port1();
+          break;
+        case GO_PORT_BY_10_ACTION:
+          EVON2K::port10();
+          break;
+        case TACK_PORT_ACTION:
+          EVON2K::tackPort();
+          break;
+        case TACK_STARBOARD_ACTION:
+          EVON2K::tackStarboard();
+          break;
+        default:
+          break;
       }
     }
     t0 = t;
     m.resetAvailable();
   } else {
     if (led && (t-led_time)>BLINK_TIME) {
-      digitalWrite(13, LOW);
+      digitalWrite(AP_BLINK_PIN, LOW);
+      digitalWrite(BEEP_PIN, LOW);
       led = false;
     }
   }
@@ -136,3 +161,4 @@ void loop() {
   bt.loop(t);
   EVON2K::poll();
 }
+

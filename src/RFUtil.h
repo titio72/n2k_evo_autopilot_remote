@@ -1,15 +1,24 @@
 #ifndef RF_UTIL_H
 #define RF_UTIL_H
 
-#define SET_STATUS_ACTION 0
-#define SET_LOCKED_HEADING_ACTION 1
+enum RF_AP_ACTIONS {
+    NO_ACTION,
+    SET_STATUS_ACTION,
+    SET_LOCKED_HEADING_ACTION,
+    GO_PORT_BY_1_ACTION,
+    GO_PORT_BY_10_ACTION,
+    GO_STARBOARD_BY_1_ACTION,
+    GO_STARBOARD_BY_10_ACTION,
+    TACK_PORT_ACTION,
+    TACK_STARBOARD_ACTION,
+};
 
 class RFUtil {
 
 public:
     RFUtil(unsigned long rf_value, unsigned long remoter_code);
 
-    int getAction();
+    RF_AP_ACTIONS getAction();
     int get_delta_degrees();
     int get_status();
 
@@ -19,7 +28,7 @@ public:
     bool is_D_pressed();
 
 private:
-    int action;
+    RF_AP_ACTIONS action;
     int delta;
     int status;
 
