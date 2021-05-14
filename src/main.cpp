@@ -148,7 +148,7 @@ void loop_normal(unsigned long t) {
       led = false;
     }
   }
-  delay(100);
+  delay(10);
 }
 
 void loop_program(unsigned long t) {
