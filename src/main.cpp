@@ -3,7 +3,6 @@
 #define AP_BLINK_PIN 13
 #define PROGRAM_PIN 34
 #define RADIO_PIN 17
-#define BEEP_PIN 16
 
 #include <Arduino.h>
 #include <EEPROM.h>
@@ -19,6 +18,8 @@ APStatus ap = APStatus(AP_STATUS_PIN);
 BTInterface bt("ABRemote");
 unsigned long remote = 0;
 bool program = false;
+
+void set_program_mode();
 
 void write_remote_id() {
     Serial.printf("[RM] Wrinting remote %lx to conf\n", remote);
@@ -59,11 +60,27 @@ const char* on_command(const char* command) {
   } else if (strcmp("-10", command)==0) {
     EVON2K::starboard10();
     return "OK";
-  } else if (strcmp("TP", command)==0) {
+  } else if (strcmp("TACKP", command)==0) {
     EVON2K::tackPort();
     return "OK";
-  } else if (strcmp("TS", command)==0) {
+  } else if (strcmp("TACKS", command)==0) {
     EVON2K::tackStarboard();
+    return "OK";
+  } else if (strcmp("HELP", command)==0) {
+    return "STATUS Get the status of the autopilot and the remote\r\n\
+    AUTO Switch to compass mode\r\n\
+    STANDBY Switch autopilot off\n\
+    +n Steer startboard\r\n\
+    -n Steer port\r\n\
+    PROG Enter programming mode\r\n";
+  } else if (strcmp("STATUS", command)==0) {
+    static char response[256];
+    sprintf(response, "Mode: %s\r\nPilot: %s\n",
+      program?"Program":"Normal",
+      ap.getStatusStr());
+      return response;
+  } else if (strcmp("PROG", command)==0) {
+    set_program_mode();
     return "OK";
   } else if (command && (command[0]=='+' || command[0]=='-')) {
     int delta = atoi(command);
@@ -94,7 +111,6 @@ void setup() {
   EVON2K::setup(&ap);
   pinMode(AP_BLINK_PIN, OUTPUT);
   pinMode(PROGRAM_PIN, INPUT);
-  pinMode(BEEP_PIN, OUTPUT);
 }
 
 void loop_normal(unsigned long t) {
@@ -104,7 +120,6 @@ void loop_normal(unsigned long t) {
   static long t0 = 0;
   if (m.available()) {
     digitalWrite(AP_BLINK_PIN, HIGH);
-    digitalWrite(BEEP_PIN, HIGH);
     led = true;
     led_time = t;
     if ((t - t0)>SINGLE_CLICK_DELAY_THRESHOLD) {
@@ -144,7 +159,6 @@ void loop_normal(unsigned long t) {
   } else {
     if (led && (t-led_time)>BLINK_TIME) {
       digitalWrite(AP_BLINK_PIN, LOW);
-      digitalWrite(BEEP_PIN, LOW);
       led = false;
     }
   }
@@ -173,11 +187,15 @@ void loop() {
     loop_normal(t);
   }
   if (!program && digitalRead(PROGRAM_PIN)==HIGH) {
-    program = true;
-    digitalWrite(AP_BLINK_PIN, HIGH);
-    printf("[RM] Switching to program mode. Click a button to complete.\n");
+    set_program_mode();
   }
   bt.loop(t);
   EVON2K::poll();
+}
+
+void set_program_mode() {
+    program = true;
+    digitalWrite(AP_BLINK_PIN, HIGH);
+    printf("[RM] Switching to program mode. Click a button to complete.\n");
 }
 

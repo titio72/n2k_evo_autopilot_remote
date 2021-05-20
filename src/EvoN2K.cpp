@@ -141,7 +141,7 @@ void EVON2K::setup(APStatus* s) {
   status = s;
   Serial.printf("[NT] Initializing N2K\n");
   NMEA2000.ExtendReceiveMessages(NULL);
-  NMEA2000.SetN2kCANReceiveFrameBufSize(1500);
+  NMEA2000.SetN2kCANReceiveFrameBufSize(200);
   NMEA2000.SetN2kCANMsgBufSize(16);
   NMEA2000.SetProductInformation("00000001", 100,
                                 /*12345678901234567890123456789012*/
@@ -149,7 +149,7 @@ void EVON2K::setup(APStatus* s) {
                                  );
   NMEA2000.SetDeviceInformation(1, /*Unique number. Use e.g. Serial number.*/ 150 /* Autopilot */, 40 /* Steering */, 2047);
   NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, SOURCE);
-  //NMEA2000.ExtendTransmitMessages(TransmitMessages);
+  NMEA2000.ExtendTransmitMessages(TransmitMessages);
   NMEA2000.ExtendReceiveMessages(ReceiveMessages);
   NMEA2000.EnableForward(false);
   NMEA2000.SetMsgHandler(on_msg);
