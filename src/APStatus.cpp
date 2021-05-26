@@ -41,6 +41,11 @@ void APStatus::overrideStatus(int s) {
     if (listener) listener(0x10);
 }
 
+void APStatus::overrideLockedHeading(int head) {
+    lockedHeading = head;
+    if (listener) listener(0x01);
+}
+
 void APStatus::onPGN(const tN2kMsg &m)
 {
  // printf("Msg %ul\n", m.PGN);
@@ -86,3 +91,14 @@ void APStatus::onPGN(const tN2kMsg &m)
   }
 }
 
+const char* APStatus::getDescription(char* c) {
+    switch (status) {
+      case AP_AUTO:
+        sprintf(c, "%s [%d]", getStatusStr(), getLockedHeading());
+        break;
+      default:
+        sprintf(c, "%s", getStatusStr());
+        break;
+    }
+    return c;
+}

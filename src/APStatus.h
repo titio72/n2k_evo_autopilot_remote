@@ -28,8 +28,11 @@ public:
     int getStatus();
     const char* getStatusStr();
 
+    const char* getDescription(char* c);
+
     // use for testing only
     void overrideStatus(int status);
+    void overrideLockedHeading(int head);
 
 private:
     int status;

@@ -6,16 +6,24 @@
 
 #include <Arduino.h>
 #include <EEPROM.h>
+#include <Wire.h>
 #include <RCSwitch.h>
+#include <Adafruit_SSD1306.h>
 #include <math.h>
 #include "APStatus.h"
 #include "EvoN2K.h"
 #include "RFUtil.h"
 #include "BTInterface.h"
+#include "Display.h"
+
+#define EVO_DISPLAY
 
 RCSwitch m = RCSwitch();
 APStatus ap = APStatus(AP_STATUS_PIN);
 BTInterface bt("ABRemote");
+#ifdef EVO_DISPLAY
+EVODisplay display;
+#endif
 unsigned long remote = 0;
 bool program = false;
 
@@ -29,14 +37,32 @@ void write_remote_id() {
     }
 }
 
+void drawstatus() {
+  #ifdef EVO_DISPLAY
+  if (program) {
+    display.draw_text("Prog");
+  } else {
+    static char c[32];
+    ap.getDescription(c);
+    display.draw_text(c);
+  }
+  #endif
+}
+
 void on_status(u_char event) {
   static char buffer[128];
   if (event & 0x01) {
     sprintf(buffer, "[AP] Locked heading {%d}", ap.getLockedHeading());
     bt.send_data((uint8_t*)buffer, strlen(buffer));
+    if (!program) {
+      drawstatus();
+    }
   } else {
     sprintf(buffer, "[AP] Status {%s} {%d}", ap.getStatusStr(), ap.getStatus());
     bt.send_data((uint8_t*)buffer, strlen(buffer));
+    if (!program) {
+      drawstatus();
+    }
   }
 }
 
@@ -67,12 +93,13 @@ const char* on_command(const char* command) {
     EVON2K::tackStarboard();
     return "OK";
   } else if (strcmp("HELP", command)==0) {
-    return "STATUS Get the status of the autopilot and the remote\r\n\
-    AUTO Switch to compass mode\r\n\
-    STANDBY Switch autopilot off\n\
-    +n Steer startboard\r\n\
-    -n Steer port\r\n\
-    PROG Enter programming mode\r\n";
+    return "STATUS: Get the status of the autopilot and the remote\r\n\
+AUTO: Switch to compass mode\r\n\
+STANDBY: Switch autopilot off\r\n\
+[+/-][1/10]: Send +1, -1, +10, -10 key-pressed command\r\n\
++N: Steer startboard\r\n\
+-N: Steer port\r\n\
+PROG: Enter programming mode";
   } else if (strcmp("STATUS", command)==0) {
     static char response[256];
     sprintf(response, "Mode: %s\r\nPilot: %s\n",
@@ -85,6 +112,16 @@ const char* on_command(const char* command) {
   } else if (command && (command[0]=='+' || command[0]=='-')) {
     int delta = atoi(command);
     if (delta) EVON2K::setLockedHeading(delta);
+    return "OK";
+  } else if (strcmp("GOAUTO", command)==0) {
+    ap.overrideStatus(AP_AUTO);
+    return "OK";
+  } else if (strcmp("GOSTANDBY", command)==0) {
+    ap.overrideStatus(AP_STANDBY);
+    return "OK";
+  } else if (command && command[0]=='H') {
+    int h = atoi(command+1);
+    ap.overrideLockedHeading(h);
     return "OK";
   } else {
     return "Unknownd command";
@@ -111,6 +148,13 @@ void setup() {
   EVON2K::setup(&ap);
   pinMode(AP_BLINK_PIN, OUTPUT);
   pinMode(PROGRAM_PIN, INPUT);
+
+
+  #ifdef EVO_DISPLAY
+  display.setup();
+  #endif
+
+  drawstatus();
 }
 
 void loop_normal(unsigned long t) {
@@ -172,6 +216,7 @@ void loop_program(unsigned long t) {
     program = false;
     digitalWrite(AP_BLINK_PIN, LOW);
     printf("[RM] Switching to normal mode.\n");
+    drawstatus();
     m.resetAvailable();
     delay(1000);
   } else {
@@ -196,6 +241,7 @@ void loop() {
 void set_program_mode() {
     program = true;
     digitalWrite(AP_BLINK_PIN, HIGH);
+    drawstatus();
     printf("[RM] Switching to program mode. Click a button to complete.\n");
 }
 

@@ -1,7 +1,7 @@
 // use this block with esp and transceiver
 #define USE_N2K_CAN USE_N2K_ESP32_CAN
-#define ESP32_CAN_RX_PIN GPIO_NUM_22
-#define ESP32_CAN_TX_PIN GPIO_NUM_23
+#define ESP32_CAN_RX_PIN GPIO_NUM_23
+#define ESP32_CAN_TX_PIN GPIO_NUM_22
 
 // use this block with MCP2515
 //#define USE_N2K_CAN USE_N2K_MCP_CAN
@@ -148,7 +148,7 @@ void EVON2K::setup(APStatus* s) {
                                  "ABRemote                        ", "1.0.0.0 (2021-05-01)", "1.0.0.0 (2021-05-01)"
                                  );
   NMEA2000.SetDeviceInformation(1, /*Unique number. Use e.g. Serial number.*/ 150 /* Autopilot */, 40 /* Steering */, 2047);
-  NMEA2000.SetMode(tNMEA2000::N2km_ListenAndNode, SOURCE);
+  NMEA2000.SetMode(tNMEA2000::N2km_ListenAndSend, SOURCE);
   NMEA2000.ExtendTransmitMessages(TransmitMessages);
   NMEA2000.ExtendReceiveMessages(ReceiveMessages);
   NMEA2000.EnableForward(false);
