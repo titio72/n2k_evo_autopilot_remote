@@ -2,7 +2,7 @@
 #include <math.h>
 #include "APStatus.h"
 
-APStatus::APStatus(int statusPin): status(AP_UNKNOWN), lockedHeading(-1), pin(statusPin) {
+APStatus::APStatus(int statusPin): status(AP_UNKNOWN), lockedHeading(-1), windVane(-1), pin(statusPin) {
 }
 
 APStatus::~APStatus() {
@@ -12,6 +12,10 @@ APStatus::~APStatus() {
 void APStatus::setup(status_listener l) {
     listener = l;
     pinMode(pin, OUTPUT);
+}
+
+int APStatus::getWind() {
+  return windVane;
 }
 
 int APStatus::getLockedHeading() {
@@ -42,8 +46,15 @@ void APStatus::overrideStatus(int s) {
 }
 
 void APStatus::overrideLockedHeading(int head) {
-    lockedHeading = head;
+    lockedHeading = head%360;
+    lockedHeading = lockedHeading<0?lockedHeading+360:lockedHeading;
     if (listener) listener(0x01);
+}
+
+void APStatus::overrideWind(int w) {
+    windVane = w%360;
+    windVane = windVane>180?windVane-360:windVane;
+    if (listener) listener(0x02);
 }
 
 void APStatus::onPGN(const tN2kMsg &m)
@@ -53,9 +64,20 @@ void APStatus::onPGN(const tN2kMsg &m)
   int index = 0;
   int x = 0;
   switch (pgn) {
-    case 65360:
+    case 65345:
+      index = 2;
+      x = (int)((RadToDeg(m.Get2ByteUDouble(0.0001, index)))) % 360;
+      x = x>180?x-360:x;
+      if (x!=windVane) {
+        Serial.printf("[AP] New wind datum %d\n", x);
+        if (listener) listener(0x02);
+      }
+      lockedHeading = x;
+      break;
+  case 65360:
       index = 5;
-      x = (int)((RadToDeg(m.Get2ByteUDouble(0.0001, index))) + 360) % 360;
+      x = (int)((RadToDeg(m.Get2ByteUDouble(0.0001, index)))) % 360;
+      x = x<0?x+360:x;
       if (x!=lockedHeading) {
         Serial.printf("[AP] New locked heading %d\n", x);
         if (listener) listener(0x01);
@@ -95,6 +117,9 @@ const char* APStatus::getDescription(char* c) {
     switch (status) {
       case AP_AUTO:
         sprintf(c, "%s [%d]", getStatusStr(), getLockedHeading());
+        break;
+      case AP_WIND_VANE:
+        sprintf(c, "%s [%d]", getStatusStr(), getWind());
         break;
       default:
         sprintf(c, "%s", getStatusStr());

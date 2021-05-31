@@ -51,13 +51,19 @@ void drawstatus() {
 
 void on_status(u_char event) {
   static char buffer[128];
-  if (event & 0x01) {
+  if (event == 0x02) {
+    sprintf(buffer, "[AP] Wind datum {%d}", ap.getWind());
+    bt.send_data((uint8_t*)buffer, strlen(buffer));
+    if (!program) {
+      drawstatus();
+    }
+  } else if (event == 0x01) {
     sprintf(buffer, "[AP] Locked heading {%d}", ap.getLockedHeading());
     bt.send_data((uint8_t*)buffer, strlen(buffer));
     if (!program) {
       drawstatus();
     }
-  } else {
+  } else if (event == 0x10) {
     sprintf(buffer, "[AP] Status {%s} {%d}", ap.getStatusStr(), ap.getStatus());
     bt.send_data((uint8_t*)buffer, strlen(buffer));
     if (!program) {
@@ -119,9 +125,16 @@ PROG: Enter programming mode";
   } else if (strcmp("GOSTANDBY", command)==0) {
     ap.overrideStatus(AP_STANDBY);
     return "OK";
+  } else if (strcmp("GOVANE", command)==0) {
+    ap.overrideStatus(AP_WIND_VANE);
+    return "OK";
   } else if (command && command[0]=='H') {
     int h = atoi(command+1);
     ap.overrideLockedHeading(h);
+    return "OK";
+  } else if (command && command[0]=='W') {
+    int h = atoi(command+1);
+    ap.overrideWind(h);
     return "OK";
   } else {
     return "Unknownd command";

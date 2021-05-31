@@ -24,6 +24,7 @@ public:
 
     void onPGN(const tN2kMsg &m);
 
+    int getWind();
     int getLockedHeading();
     int getStatus();
     const char* getStatusStr();
@@ -33,10 +34,12 @@ public:
     // use for testing only
     void overrideStatus(int status);
     void overrideLockedHeading(int head);
+    void overrideWind(int wind);
 
 private:
     int status;
     int lockedHeading;
+    int windVane;
     int pin;
 
     status_listener listener;
